@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ركّز | مؤقت دراسة ومهام</title>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EEECF8;--ink:#201A44;--violet:#5B3DF5;--rest:#14A38B;--card:#fff;--muted:#6B6890;--line:#D8D4EE}
+*{box-sizing:border-box;margin:0}
+body{font-family:'IBM Plex Sans Arabic',Tahoma,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:grid;place-items:center;padding:24px}
+h1,.time,h2{font-family:'Readex Pro',Tahoma,sans-serif}
+.app{display:grid;grid-template-columns:360px 1fr;gap:24px;width:min(900px,100%)}
+.card{background:var(--card);border-radius:20px;padding:32px}
+.timer{text-align:center}
+.modes{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+.modes button{font:inherit;border:1px solid var(--line);background:none;border-radius:999px;padding:4px 16px;cursor:pointer;color:var(--ink)}
+.modes button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.ring{position:relative;width:220px;height:220px;margin:8px auto}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:12}
+.bg{stroke:var(--line)}
+#bar{stroke:var(--violet);stroke-linecap:round;stroke-dasharray:565.5;transition:stroke-dashoffset 1s linear,stroke .3s}
+.rest #bar{stroke:var(--rest)}
+.time{position:absolute;inset:0;display:grid;place-items:center;font-size:2.8rem;font-weight:600}
+#now{color:var(--muted);min-height:1.7em;margin:8px 0 16px;font-size:.95rem}
+.ctrl button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 24px;cursor:pointer;margin:0 4px}
+#go{background:var(--violet);color:#fff}.rest #go{background:var(--rest)}
+#reset{background:var(--bg);color:var(--ink)}
+h2{font-size:1.2rem;margin-bottom:16px}
+form{display:flex;gap:8px;margin-bottom:16px}
+input{flex:1;font:inherit;padding:10px 14px;border:1px solid var(--line);border-radius:10px;color:var(--ink)}
+form button{font:inherit;font-weight:600;border:0;border-radius:10px;background:var(--ink);color:#fff;padding:0 20px;cursor:pointer}
+li{list-style:none;display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:2px solid transparent;cursor:pointer}
+li.sel{border-color:var(--violet);background:#F5F3FF}
+li.done span{text-decoration:line-through;color:var(--muted)}
+li span{flex:1}
+li small{color:var(--muted)}
+li .x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:1.1rem}
+.empty{color:var(--muted)}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--violet)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+@media(max-width:800px){.app{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <section class="card timer">
+    <div class="modes"><button class="on" data-m="focus">تركيز 25 د</button><button data-m="rest">استراحة 5 د</button></div>
+    <div class="ring">
+      <svg width="220" height="220" viewBox="0 0 220 220"><circle class="bg" cx="110" cy="110" r="90"/><circle id="bar" cx="110" cy="110" r="90"/></svg>
+      <div class="time" id="time">25:00</div>
+    </div>
+    <p id="now">اختر مهمة من القائمة، أو ابدأ بدونها.</p>
+    <div class="ctrl"><button id="go">ابدأ</button><button id="reset">إعادة</button></div>
+  </section>
+  <section class="card">
+    <h2>مهام اليوم</h2>
+    <form id="form"><input id="inp" placeholder="مثال: مراجعة Data Structures" required><button>أضف</button></form>
+    <ul id="tasks"></ul>
+  </section>
+</div>
+<script>
+const LEN={focus:1500,rest:300},C=565.5,$=s=>document.querySelector(s);
+let mode='focus',left=LEN.focus,tick=null,tasks=[],active=null;
+try{tasks=JSON.parse(localStorage.getItem('tasks')||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem('tasks',JSON.stringify(tasks))}catch(e){}};
+function draw(){
+  const m=String(Math.floor(left/60)).padStart(2,'0'),s=String(left%60).padStart(2,'0');
+  $('#time').textContent=m+':'+s;document.title=(tick?m+':'+s+' | ':'')+'ركّز';
+  $('#bar').style.strokeDashoffset=C*(1-left/LEN[mode]);
+  $('#app').className='app '+(mode==='rest'?'rest':'');
+  $('#go').textContent=tick?'إيقاف مؤقت':'ابدأ';
+  const t=tasks.find(x=>x.id===active);
+  $('#now').textContent=mode==='rest'?'خذ نفساً، اشرب ماء.':t?'تعمل الآن على: '+t.t:'اختر مهمة من القائمة، أو ابدأ بدونها.';
+}
+function setMode(m){clearInterval(tick);tick=null;mode=m;left=LEN[m];
+  document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));draw()}
+function toggle(){
+  if(tick){clearInterval(tick);tick=null;draw();return}
+  tick=setInterval(()=>{left--;
+    if(left<=0){const t=tasks.find(x=>x.id===active);
+      if(mode==='focus'&&t){t.s++;save();list()}
+      setMode(mode==='focus'?'rest':'focus');return}
+    draw()},1000);draw();
+}
+function list(){
+  $('#tasks').innerHTML=tasks.length?tasks.map(t=>
+   `<li class="${t.id===active?'sel':''} ${t.d?'done':''}" data-id="${t.id}"><input type="checkbox" ${t.d?'checked':''} aria-label="تم">
+    <span>${t.t}</span><small>${t.s} جلسة</small><button class="x" aria-label="حذف">✕</button></li>`).join('')
+   :'<p class="empty">لا توجد مهام بعد. أضف أول مهمة لتبدأ.</p>';
+}
+$('#form').onsubmit=e=>{e.preventDefault();const v=$('#inp').value.trim();if(!v)return;
+  tasks.push({id:Date.now(),t:v,d:false,s:0});$('#inp').value='';save();list()};
+$('#tasks').onclick=e=>{
+  const li=e.target.closest('li');if(!li)return;const id=+li.dataset.id,t=tasks.find(x=>x.id===id);
+  if(e.target.classList.contains('x')){tasks=tasks.filter(x=>x.id!==id);if(active===id)active=null}
+  else if(e.target.type==='checkbox'){t.d=e.target.checked}
+  else active=id;
+  save();list();draw();
+};
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+$('#go').onclick=toggle;$('#reset').onclick=()=>setMode(mode);
+list();draw();
+</script>
+</body>
+</html>
